@@ -25,8 +25,8 @@ class FrEnDataset(Dataset):
         fr = self.fr_lines[idx]
         en = self.en_lines[idx]
 
-        fr_tok = tokenizer.encode(fr)
-        en_tok = tokenizer.encode(en)
+        fr_tok = tokenizer.encode(fr)[:198]
+        en_tok = tokenizer.encode(en)[:198]
 
         return torch.cat(
             [

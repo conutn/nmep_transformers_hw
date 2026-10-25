@@ -12,7 +12,7 @@ from seq2seq.transformer.transformer import Transformer
 from seq2seq.data.fr_en import FrEnDataset, collate_fn, tokenizer
 
 run = wandb.init(
-    entity="<INSERT ENTITY HERE>",
+    entity="wolnut816816-university-of-california-berkeley",
     project="transformer",
     config={
         "learning_rate": 0.00005,
@@ -21,7 +21,15 @@ run = wandb.init(
         "epochs": 10,
     },
 )
+def count_parameters(model):
+    total = sum(p.numel() for p in model.parameters())
+    trainable = sum(
+        p.numel() for p in model.parameters() if p.requires_grad
+    )
 
+    print(f"Total parameters: {total,}")
+    print(f"Trainable parameters: {trainable:,}")
+    print(f"FP32 parameter memory: {total * 4 / 1024 ** 3:.2f} GiB")
 
 def decode(model, src_sentence, max_len=100, device="cpu"):
     model.eval()
@@ -30,7 +38,9 @@ def decode(model, src_sentence, max_len=100, device="cpu"):
     tgt_tokens = [tokenizer.bos_token_id]
 
     for _ in tqdm(range(max_len)):
+        src_tensor = src_tensor.long()
         tgt_tensor = torch.tensor([tgt_tokens]).to(device)
+        tgt_tensor = tgt_tensor.long()
         with torch.no_grad():
             output = model(src_tensor.unsqueeze(0), tgt_tensor)
 
@@ -70,7 +80,7 @@ def train_nmt():
     vocab_size = len(tokenizer.vocab)
     num_layers = 6
     num_heads = 8
-    embedding_dim = 512
+    embedding_dim = 512 
     ffn_hidden_dim = 4 * embedding_dim  # standard practice
     qk_length = embedding_dim // num_heads # standard practice (note that qk_length is a per-head dqk)
     value_length = embedding_dim // num_heads # standard practice
@@ -102,12 +112,12 @@ def train_nmt():
         dropout=dropout,
         device=device,
     ).to(device)
-
-    # TODO: loss shouldn't include pad tokens, so it should ignore pad token ids
-    criterion = nn.CrossEntropyLoss(ignore_index=...)
+    # loss shouldn't include pad tokens, so it should ignore pad token ids
+    criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
     optimizer = optim.AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
     scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
-
+    scaler = torch.amp.GradScaler("cuda")
+    optimizer.zero_grad(set_to_none=True)
     # train over all epochs, checkpointing every 25 epochs
     for epoch in range(epochs):
         model.train()
@@ -116,20 +126,23 @@ def train_nmt():
         for i, (src, tgt) in enumerate(data_tqdm):
             try:
                 src, tgt = src.to(device), tgt.to(device)
-
+                src = src.long()
+                tgt = tgt.long()
                 tgt_input = tgt[:, :-1]
-
-                # TODO: if the input is up to the second-last token,
+                # if the input is up to the second-last token,
                 # what should the output be?
-                tgt_output = ...
+                tgt_output = tgt[:, 1:] 
 
-                optimizer.zero_grad()
+                with torch.autocast("cuda", dtype=torch.float16):
+                    output = model(src, tgt_input)
+                    loss = criterion(output.reshape(-1, vocab_size), tgt_output.reshape(-1))
+                scaler.scale(loss).backward()
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad(set_to_none=True)
 
-                output = model(src, tgt_input)
-
-                loss = criterion(output.reshape(-1, vocab_size), tgt_output.reshape(-1))
-                loss.backward()
-                optimizer.step()
                 scheduler.step()
 
                 total_loss += loss.item()

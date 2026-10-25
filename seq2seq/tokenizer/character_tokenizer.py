@@ -17,23 +17,19 @@ class CharacterTokenizer(Tokenizer):
         """
         super().__init__()
 
-        self.vocab = {}
 
         # Normally, we iterate through the dataset and find all unique characters. To simplify things,
         # we will use a fixed set of characters that we know will be present in the dataset.
-        self.characters = """aàâæbcçdeéèêëfghiîïjklmnoôœpqrstuùûüvwxyÿz0123456789,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{}’•–í€óá«»… º◦©ö°äµ—ø­·òãñ―½¼γ®⇒²▪−√¥£¤ß´úª¾є™，ﬁõ  �►□′″¨³‑¯≈ˆ§‰●ﬂ⇑➘①②„≤±†✜✔➪✖◗¢ไทยếệεληνικαåşıруский 한국어汉语ž¹¿šćþ‚‛─÷〈¸⎯×←→∑δ■ʹ‐≥τ;∆℡ƒð¬¡¦βϕ▼⁄ρσ⋅≡∂≠π⎛⎜⎞ω∗"""
-
+        self.characters = """\t\n !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]_`abcdefghijklmnopqrstuvwxyz{|}\x80\xa0¡£§©«\xad°±²³´µ·¸¹º»¼½¾¿ÀÁÂÄÅÆÇÈÉÊÌÍÎÏÐÑÓÔÖØÙÚÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþāăąĆćĉČčďĐđēėęěğĢīİıķļĽľŁłńņňōŐőŒœŕŘřŚśŞşŠšŢţťūůųŵźŻżŽžǎǐǔșʻ˗˚ΑΒΕΙΚΜΝΟΠΡΤΥάέήίαβγδεζηικλμνξοπρςστυφχψωόύώЄАДМНОПТУабвгдежзийклмнопрстучшъыьюяєіїᵉᵐ\u200b–—―‘’“”„•…″€−○♦✓�"""
         if verbose:
             print("Vocabulary:", self.vocab)
 
-        raise NotImplementedError("Need to implement vocab initialization")
+        self.vocab = {v: k for k, v in enumerate(self.characters)}
 
     def encode(self, text: str) -> torch.Tensor:
-        raise NotImplementedError(
-            "Need to implement encoder that converts text to tensor of tokens."
-        )
+        lst = [*map(self.vocab.__getitem__, text.lower())]
+        return torch.tensor(lst)
 
     def decode(self, tokens: torch.Tensor) -> str:
-        raise NotImplementedError(
-            "Need to implement decoder that converts tensor of tokens to text."
-        )
+        lst = tokens.tolist()
+        return "".join(map(self.characters.__getitem__, lst))

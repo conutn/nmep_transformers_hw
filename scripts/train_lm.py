@@ -12,7 +12,7 @@ from seq2seq.transformer.transformer import Decoder
 from seq2seq.data.screenplay import ScreenplayDataset, collate_fn, tokenizer
 
 run = wandb.init(
-    entity="<INSERT ENTITY HERE>",
+    entity="wolnut816816-university-of-california-berkeley",
     project="transformer",
     config={
         "learning_rate": 0.00005,
@@ -117,8 +117,8 @@ def train_lm():
         dropout=dropout,
     ).to(device)
 
-    # TODO: loss shouldn't include pad tokens, so it should ignore pad token ids
-    criterion = nn.CrossEntropyLoss(ignore_index=...)
+    # loss shouldn't include pad tokens, so it should ignore pad token ids
+    criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
     optimizer = optim.AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
     scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
 
@@ -134,7 +134,9 @@ def train_lm():
                 batch = batch.to(device)
 
                 batch_input = batch[:, :-1]
-                batch_output = ...  # TODO: same idea from train_nmt.py
+                batch_output = batch[:, 1:] 
+                batch_input = batch_input.long()
+                batch_output = batch_output.long()
 
                 optimizer.zero_grad()
 
@@ -173,6 +175,7 @@ def train_lm():
                 )
             except Exception as e:
                 print(e)
+                raise
 
             if global_step % 5000 == 0 and i > 0:
                 print("Saving checkpoint...")
