@@ -59,7 +59,6 @@ def decode(model, max_length, start_tokens=None, gen_len=2000, device="cpu", mod
 
         if next_token == tokenizer.eos_token_id:
             break
-
         tgt_tokens.append(next_token)
 
         print(tokenizer.decode(torch.tensor([next_token])), sep="", end="", flush=True)

@@ -118,7 +118,7 @@ def train_lm():
     ).to(device)
 
     # loss shouldn't include pad tokens, so it should ignore pad token ids
-    criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
+    criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id, reduction="none")
     optimizer = optim.AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
     scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
 
@@ -138,7 +138,7 @@ def train_lm():
                 batch_input = batch_input.long()
                 batch_output = batch_output.long()
 
-                optimizer.zero_grad()
+                optimizer.zero_grad(set_to_none=True)
 
                 trg_pad_mask = make_pad_mask(batch_input, batch_input)
                 trg_no_peak_mask = make_no_peak_mask(batch_input, batch_input)
@@ -149,7 +149,18 @@ def train_lm():
 
                 loss = criterion(
                     output.reshape(-1, vocab_size), batch_output.reshape(-1)
-                )
+                ).reshape(batch_output.shape)
+
+                weights = torch.ones_like(loss)
+
+                whitespace_mask = torch.zeros_like(batch_output, dtype=torch.bool)
+                for token_id in [198, 220]:
+                    whitespace_mask |= batch_output == token_id
+
+                weights[whitespace_mask] = 0.2
+                valid_mask = batch_output != tokenizer.pad_token_id
+                weights = weights * valid_mask
+                loss = (loss * weights).sum() / weights.sum().clamp_min(1)
 
                 loss.backward()
                 norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # gradient clipping
@@ -175,7 +186,6 @@ def train_lm():
                 )
             except Exception as e:
                 print(e)
-                raise
 
             if global_step % 5000 == 0 and i > 0:
                 print("Saving checkpoint...")
