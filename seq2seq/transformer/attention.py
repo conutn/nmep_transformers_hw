@@ -99,11 +99,10 @@ class MultiHeadAttention(nn.Module):
         S = torch.matmul(Q, KT)
         S = S / (self.qk_length) ** 0.5
         if mask is not None:
+            if mask.ndim == 3: mask = mask.unsqueeze(1)
             S = S.masked_fill(mask, float('-inf'))
         S = torch.softmax(S, dim=-1)
         S = torch.matmul(S, V)
-        S = self.combine_heads(S)
-        S = self.out_proj(S)
         return S
 
     def forward(
@@ -125,10 +124,13 @@ class MultiHeadAttention(nn.Module):
         Returns:
             torch.Tensor of shape (B, T, C)
         """
+
         Q = self.split_heads(Q, self.qk_length)
         K = self.split_heads(K, self.qk_length)
         V = self.split_heads(V, self.value_length)
         attn = self.scaled_dot_product_attention(Q, K, V, mask)
+        attn = self.combine_heads(attn)
+        attn = self.out_proj(attn)
         return attn
 
 
